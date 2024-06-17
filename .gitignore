@@ -163,3 +163,6 @@ cython_debug/
 
 # Ignore this common file on Mac
 **/.DS_Store
+
+# Ignore rubin_sim directories
+data/rubin_sim*

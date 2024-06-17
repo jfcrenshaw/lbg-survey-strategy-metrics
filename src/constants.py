@@ -8,7 +8,7 @@ color_i = "C1"
 black = "#262626"
 
 # Sky areas
-A_sky = 41_253 # deg^2
-A_wfd = 18_000 # deg^2
+A_sky = 41_253  # deg^2
+A_wfd = 18_000  # deg^2
 fwfd = A_wfd / A_sky
 deg2_per_ster = A_sky / (4 * 3.14159)

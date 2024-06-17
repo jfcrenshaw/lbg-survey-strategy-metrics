@@ -1,7 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-from scipy.interpolate import interpn
 
 # Table 2 from arXiv:1402.0677
 _table = """
@@ -52,75 +49,118 @@ for row in _table.split(" \\")[:-1]:
     _tls_params.append([float(p) for p in row.split(" & ")[1:]])
 _tls_params = np.array(_tls_params)
 
+
 def tls_laf(wavelen: float, z: float) -> float:
     # Lyman-series optical depth of the Lyman-alpha Forest
-    tau = _tls_params[:, 1:4] * np.power((wavelen / _tls_params[:, 0])[:, None], [1.2, 3.7, 5.5])
-    tau *= ((_tls_params[:, 0] < wavelen) & (wavelen < _tls_params[:, 0] * (1 + z)))[:, None]
-    tau[:, 0] *= (wavelen < 2.2 * _tls_params[:, 0])
-    tau[:, 1] *= (2.2 * _tls_params[:, 0] <= wavelen) & (wavelen < 5.7 * _tls_params[:, 0])
-    tau[:, 2] *= (5.7 * _tls_params[:, 0] <= wavelen)
+    tau = _tls_params[:, 1:4] * np.power(
+        (wavelen / _tls_params[:, 0])[:, None], [1.2, 3.7, 5.5]
+    )
+    tau *= ((_tls_params[:, 0] < wavelen) & (wavelen < _tls_params[:, 0] * (1 + z)))[
+        :, None
+    ]
+    tau[:, 0] *= wavelen < 2.2 * _tls_params[:, 0]
+    tau[:, 1] *= (2.2 * _tls_params[:, 0] <= wavelen) & (
+        wavelen < 5.7 * _tls_params[:, 0]
+    )
+    tau[:, 2] *= 5.7 * _tls_params[:, 0] <= wavelen
     return tau.sum()
+
+
 tls_laf = np.vectorize(tls_laf)
 
-def tls_dla(wavelen: float, z:float) -> float:
+
+def tls_dla(wavelen: float, z: float) -> float:
     # Lyman-series optical depth of the Damped Lyman-alpha Systems (DLAs)
-    tau = _tls_params[:, 4:] * np.power((wavelen / _tls_params[:, 0])[:, None], [2.0, 3.0])
-    tau *= ((_tls_params[:, 0] < wavelen) & (wavelen < _tls_params[:, 0] * (1 + z)))[:, None]
-    tau[:, 0] *= (wavelen < 3.0 * _tls_params[:, 0])
-    tau[:, 1] *= (3.0 * _tls_params[:, 0] <= wavelen)
+    tau = _tls_params[:, 4:] * np.power(
+        (wavelen / _tls_params[:, 0])[:, None], [2.0, 3.0]
+    )
+    tau *= ((_tls_params[:, 0] < wavelen) & (wavelen < _tls_params[:, 0] * (1 + z)))[
+        :, None
+    ]
+    tau[:, 0] *= wavelen < 3.0 * _tls_params[:, 0]
+    tau[:, 1] *= 3.0 * _tls_params[:, 0] <= wavelen
     return tau.sum()
+
+
 tls_dla = np.vectorize(tls_dla)
 
-def tlc_laf(wavelen: float, z:float) -> float:
+
+def tlc_laf(wavelen: float, z: float) -> float:
     # Lyman continuum optical depth of the Lyman-alpha Forest
     w = wavelen / _lambda_L
     if w < 1:
         return 0
     if z < 1.2:
         if w < 1 + z:
-            return 0.325 * (w**1.2 - (1 + z)**(-0.9) * w**2.1)
+            return 0.325 * (w**1.2 - (1 + z) ** (-0.9) * w**2.1)
         else:
             return 0
     elif z < 4.7:
         if w < 2.2:
-            return 2.55e-2 * (1 + z)**1.6 * w**2.1 + 0.325 * w**1.2 - 0.25 * w**2.1
+            return 2.55e-2 * (1 + z) ** 1.6 * w**2.1 + 0.325 * w**1.2 - 0.25 * w**2.1
         elif w < 1 + z:
-            return 2.55e-2 * ((1 + z)**1.6 * w**2.1 - w**3.7)
+            return 2.55e-2 * ((1 + z) ** 1.6 * w**2.1 - w**3.7)
         else:
             return 0
     else:
         if w < 2.2:
-            return 5.22e-4 * (1 + z)**3.4 * w**2.1 + 0.325 * w**1.2 - 3.14e-2 * w**2.1
+            return 5.22e-4 * (1 + z) ** 3.4 * w**2.1 + 0.325 * w**1.2 - 3.14e-2 * w**2.1
         elif w < 5.7:
-            return 5.22e-4 * (1 + z)**3.4 * w**2.1 + 0.218 * w**2.1 - 2.55e-2 * w**3.7
+            return 5.22e-4 * (1 + z) ** 3.4 * w**2.1 + 0.218 * w**2.1 - 2.55e-2 * w**3.7
         elif w < 1 + z:
-            return 5.22e-4 * ((1 + z)**3.4 * w**2.1 - w**5.5)
+            return 5.22e-4 * ((1 + z) ** 3.4 * w**2.1 - w**5.5)
         else:
             return 0
+
+
 tlc_laf = np.vectorize(tlc_laf)
 
-def tlc_dla(wavelen: float, z:float) -> float:
+
+def tlc_dla(wavelen: float, z: float) -> float:
     # Lyman continuum optical depth of Damped Lyman-alpha Systems (DLAs)
     w = wavelen / _lambda_L
     if w < 1:
         return 0
     if z < 2:
         if w < 1 + z:
-            return 0.211 * (1 + z)**2 - 7.66e-2 * (1 + z)**2.3 * w**(-0.3) - 0.135 * w**2
+            return (
+                0.211 * (1 + z) ** 2
+                - 7.66e-2 * (1 + z) ** 2.3 * w ** (-0.3)
+                - 0.135 * w**2
+            )
         else:
             return 0
     else:
         if w < 3:
-            return 0.634 + 4.7e-2 * (1 + z)**3 - 1.78e-2 * (1 + z)**3.3 * w**(-0.3) - 0.135 * w**2 - 0.291 * w**-0.3
+            return (
+                0.634
+                + 4.7e-2 * (1 + z) ** 3
+                - 1.78e-2 * (1 + z) ** 3.3 * w ** (-0.3)
+                - 0.135 * w**2
+                - 0.291 * w**-0.3
+            )
         elif w < 1 + z:
-            return 4.7e-2 * (1 + z)**3 - 1.78e-2 * (1 + z)**3.3 * w**(-0.3) - 2.92e-2 * w**3
+            return (
+                4.7e-2 * (1 + z) ** 3
+                - 1.78e-2 * (1 + z) ** 3.3 * w ** (-0.3)
+                - 2.92e-2 * w**3
+            )
         else:
             return 0
+
+
 tlc_dla = np.vectorize(tlc_dla)
+
 
 def tau(wavelen: np.ndarray, z: float) -> np.ndarray:
     # Optical depth of IGM due to Lyman transitions
-    return tls_laf(wavelen, z) + tls_dla(wavelen, z) + tlc_laf(wavelen, z) + tlc_dla(wavelen, z)
+    return (
+        tls_laf(wavelen, z)
+        + tls_dla(wavelen, z)
+        + tlc_laf(wavelen, z)
+        + tlc_dla(wavelen, z)
+    )
+
 
 def T(wavelen: np.ndarray, z: float) -> np.ndarray:
     # Transmission of the IGM due to Lyman transitions

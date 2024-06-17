@@ -1,8 +1,7 @@
-import numpy as np
-from astropy.modeling.models import Schechter1D
-from astropy.cosmology import Planck18 as cosmo
 import astropy.units as u
-
+import numpy as np
+from astropy.cosmology import Planck18 as cosmo
+from astropy.modeling.models import Schechter1D
 
 # Define Schechter LF params for each sample
 # from Table 6 of arXiv:2108.01090
