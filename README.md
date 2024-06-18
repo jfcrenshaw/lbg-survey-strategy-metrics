@@ -1,4 +1,4 @@
-# lbg-survey-strategy-metrics
+# lbg-survey-metrics
 Survey Strategy Metrics for Detecting LBGs with the Rubin Observatory
 
 Installation (from the root directory):
@@ -20,10 +20,6 @@ The scripts in `bin/` are meant to be run in the following order:
 4. Create the CMB lensing cache by running `bin/create_cmb_xcorr_cache.py`
 
 Note you will have to source the first 2 bash scripts every time you start a new session.
-The first time you run the first two commands, it typically takes a few hours and consumes 
+The first time you run the first two commands, it typically takes a few hours and consumes 23 GB to download all the data.
 
 The notebooks in the top-level directory create all the plots in the paper and can be run in any order.
-
-To run `survey_metrics.ipynb` there are several scripts you must run first:
-
-Downloading all the data typically takes a few hours and consumes 23 GB.
