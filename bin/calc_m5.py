@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
@@ -9,10 +10,17 @@ from rubin_sim.maf.metrics.exgal_m5 import ExgalM5
 # Define the directory where the m5 maps are saved
 out_dir = Path(__file__).parents[1] / "data" / "rubin_sim_m5"
 
+
 # Function to compute m5 maps
 def run_metric_bundles():
     # List of sims to run
-    run_dir = Path(__file__).parents[1] / "data" / "rubin_sim_runs"
+    try:
+        run_dir = Path(os.environ["RUBIN_SIM_RUNS_DIR"])
+    except KeyError:
+        raise RuntimeError(
+            "Environment variable RUBIN_SIM_RUNS_DIR is not set. "
+            "You need to run bin/setup_runs.sh."
+        )
     run_list = list(run_dir.rglob("*.db"))
 
     # Create sky map
@@ -29,8 +37,8 @@ def run_metric_bundles():
     metric = ExgalM5()
 
     # Loop over all the runs
-    m5_bundles = []
     for file in run_list:
+        m5_bundles = []
         # Loop over survey years
         for year in [1, 4, 7, 10]:
             # Calculate days until this year
@@ -59,8 +67,7 @@ def run_metric_bundles():
 # Function to rename files of m5 maps
 def rename_files():
     # Get all the metrics
-    path = Path("data/rubin_sim_m5")
-    files = list(path.glob("*"))
+    files = list(out_dir.glob("*"))
     for file in files:
         try:
             # Get the number of years for this file

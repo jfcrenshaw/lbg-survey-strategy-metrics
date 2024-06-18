@@ -12,7 +12,7 @@ dependencies:
   - matplotlib
   - mypy
   - numpy
+  - pip
   - pyccl
   - python=3.11
   - rubin-sim
-  - tqdm

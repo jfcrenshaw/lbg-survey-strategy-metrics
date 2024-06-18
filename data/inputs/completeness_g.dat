@@ -1,0 +1,17 @@
+# Completeness for g dropout selection
+# Black curve from Fig. 4 of https://arxiv.org/abs/2108.01090
+3.1  0.00
+3.2  0.02
+3.3  0.18
+3.4  0.56
+3.5  0.61
+3.6  0.66
+3.7  0.65
+3.8  0.63
+3.9  0.61
+4.0  0.62
+4.1  0.61
+4.2  0.56
+4.3  0.25
+4.4  0.04
+4.5  0.00
