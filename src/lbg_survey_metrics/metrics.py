@@ -7,6 +7,7 @@ from .constants import A_wfd
 from .galaxy_distribution import number_density
 from .utils import cache_cmb_snr, cache_pz_stat
 
+
 def density_for_quantile(
     q: float,
     m5: maf.MetricBundle,
@@ -201,8 +202,8 @@ def _calc_snr(
     f_wfd = _fwfd_from_quantile(q, m5)
 
     # Calculate SNR
-    n_grid = cache_cmb_snr["n"]["band"]
-    snr_grid = cache_cmb_snr["snr"]["band"]
+    n_grid = cache_cmb_snr["n"][band]
+    snr_grid = cache_cmb_snr["snr"][band]
     snr = np.interp(n, n_grid, snr_grid * np.sqrt(f_wfd))
 
     return snr
