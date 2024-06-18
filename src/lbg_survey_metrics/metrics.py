@@ -1,5 +1,3 @@
-import warnings
-
 import healpy as hp
 import numpy as np
 import rubin_sim.maf as maf
@@ -7,19 +5,7 @@ from scipy.optimize import minimize_scalar
 
 from .constants import A_wfd
 from .galaxy_distribution import number_density
-from .utils import data_dir
-
-# Load the CMB cross-correlation cache
-_snr_cache_file = data_dir / "cmb_xcorr_snr_cache.npz"
-if _snr_cache_file.exists():
-    _snr_cache = np.load(_snr_cache_file, allow_pickle=True)
-else:
-    warnings.warn(
-        "The CMB cross-correlation SNR cache does not exist. "
-        "You should run `cmb_lensing_snr.ipynb` before computing SNR metrics."
-    )
-    _snr_cache = None
-
+from .utils import cache_cmb_snr, cache_pz_stat
 
 def density_for_quantile(
     q: float,
@@ -196,6 +182,12 @@ def _calc_snr(
     float
         Signal-to-noise ratio of LBG x CMB Lensing correlation
     """
+    # Raise error if cache not yet created
+    if cache_cmb_snr is None:
+        raise RuntimeError(
+            "CMB SNR Cache does not exist. Please run bin/create_caches.py"
+        )
+    
     # Get the number density
     n = density_for_quantile(
         q=q,
@@ -209,8 +201,8 @@ def _calc_snr(
     f_wfd = _fwfd_from_quantile(q, m5)
 
     # Calculate SNR
-    n_grid = np.array(_snr_cache["n"].tolist()[band])
-    snr_grid = np.array(_snr_cache["snr"].tolist()[band])
+    n_grid = cache_cmb_snr["n"]["band"]
+    snr_grid = cache_cmb_snr["snr"]["band"]
     snr = np.interp(n, n_grid, snr_grid * np.sqrt(f_wfd))
 
     return snr

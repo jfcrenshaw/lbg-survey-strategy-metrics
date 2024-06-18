@@ -167,5 +167,5 @@ cython_debug/
 # Ignore rubin_sim directories
 data/rubin_sim*
 
-# And the CMB cache
-data/cmb_xcorr_snr_cache.npz
+# Ignore caches
+data/caches
