@@ -15,7 +15,7 @@ m5 = np.linspace(22, 31, 100)
 # Calculate redshift distributions
 mean = {}
 sig = {}
-for i, band in enumerate("ugr"):
+for i, band in enumerate("ugriz"):
     # Get redshift distributions for range of limiting magnitudes
     z, pz = redshift_distribution(m5, band)
 
@@ -30,9 +30,10 @@ np.savez(cache_file_pz_stat, m5=m5, pz_mean=mean, pz_sig=sig)
 # Calculate the CMB SNR across a wide range of number densities
 n = {}
 snr = {}
-for band in "ugr":
+for band in "ugriz":
     n[band] = number_density(m5, band)
     snr[band] = np.array([calc_LBGxCMB_snr(m, band) for m in m5])
 
 # Save cache
 np.savez(cache_file_cmb_snr, m5=m5, n=n, snr=snr)
+

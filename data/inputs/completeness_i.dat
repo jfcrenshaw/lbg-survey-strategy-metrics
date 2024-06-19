@@ -1,0 +1,12 @@
+# Completeness for i dropout selection
+# Black curve from Fig. 4 of https://arxiv.org/abs/2108.01090
+5.4  0.00
+5.5  0.01
+5.6  0.14
+5.7  0.51
+5.8  0.56
+5.9  0.55
+6.0  0.54
+6.1  0.53
+6.2  0.11
+6.3  0.00

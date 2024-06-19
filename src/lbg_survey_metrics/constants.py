@@ -6,12 +6,16 @@ colors = dict(
     g="C0",
     r="C2",
     i="C1",
+    z="C3",
+    y="C5",
     black="#262626",
 )
 cmaps = dict(
     u="Purples",
     g="Blues",
     r="Greens",
+    i="Oranges",
+    z="Reds",
 )
 
 # Sky areas

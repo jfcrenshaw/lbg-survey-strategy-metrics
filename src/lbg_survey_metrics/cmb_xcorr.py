@@ -5,15 +5,9 @@ from .constants import *
 from .galaxy_distribution import number_density, redshift_distribution
 from .utils import *
 
+
 # Create LCDM Cosmology
 cosmo = ccl.CosmologyVanillaLCDM()
-
-# Linear galaxy bias from Table 5 of https://arxiv.org/abs/1904.13378
-LBG_bias = {
-    "u": 4.0,
-    "g": 3.2,
-    "r": 5.4,
-}
 
 # Minimum-variance baseline forecast for SO lensing noise
 lensing_noise = np.genfromtxt(
@@ -53,7 +47,7 @@ def create_lbg_tracer(
     )
 
     # Increase redshift sample density
-    z = np.linspace(0, 6, 1000)
+    z = np.linspace(1, 8, 1000)
     pz = np.interp(z, _z, _pz)
 
     # Create the tracer
@@ -61,7 +55,7 @@ def create_lbg_tracer(
         cosmo,
         has_rsd=False,
         dndz=(z, pz),
-        bias=(z, np.full_like(z, LBG_bias[band])),
+        bias=(z, 0.28 * (1 + z) ** 1.6),
     )
 
     return tracer

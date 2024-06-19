@@ -6,69 +6,73 @@ from astropy.modeling.models import Schechter1D
 from .constants import deg2_per_ster
 from .utils import get_completeness
 
-# Define Schechter LF params for each sample
-# from Table 6 of arXiv:2108.01090
+
+# Double power-law params from Table 6 of https://arxiv.org/abs/2108.01090
 lf_params = {
     "u": {
-        "log_phi_star": -2.84,
-        "M_star": -20.91,
-        "alpha": -1.68,
+        "M_star": -21.30,
+        "log_phi_star": -3.23,
+        "alpha": -1.89,
+        "beta": -4.78,
     },
     "g": {
-        "log_phi_star": -2.52,
-        "M_star": -20.49,
-        "alpha": -1.59,
+        "M_star": -20.99,
+        "log_phi_star": -3.00,
+        "alpha": -1.86,
+        "beta": -4.77,
     },
     "r": {
-        "log_phi_star": -3.16,
-        "M_star": -21.09,
-        "alpha": -1.79,
+        "M_star": -21.54,
+        "log_phi_star": -3.63,
+        "alpha": -2.01,
+        "beta": -4.91,
+    },
+    "i": {
+        "M_star": -21.03,
+        "log_phi_star": -3.52,
+        "alpha": -2.08,
+        "beta": -4.57,
+    },
+    "z": {
+        "M_star": -20.12,
+        "log_phi_star": -3.05,
+        "alpha": -1.89,
+        "beta": -3.81,
     },
 }
 
 
-def schecter_lf(
-    m_grid: np.ndarray,
-    log_phi_star: float = -2.84,
-    M_star: float = -20.91,
-    alpha: float = -1.68,
-    redshift: float | np.ndarray = 3,
+def dpl_lf(
+    M_grid: np.ndarray,
+    band: str,
 ) -> np.ndarray:
-    """Schecter Luminosity Function on grid of apparent magnitudes.
+    """Double power law luminosity function.
 
-    Defaults are for z~3 u-dropout Luminosity Function from Table 6
-    of Harikane et al. 2022.
+    Uses parameters from Table 6 of https://arxiv.org/abs/2108.01090
 
     Parameters
     ----------
-    m_grid: np.ndarray
-        Array of apparent AB magnitudes on which to calculate the
-        luminosity function.
-    log_phi_star: float, default=-2.84
-        Natural log of phi_star, the normalization of the luminosity
-        function in units of mag^-1 Mpc^-3
-    M_star: float, default=-20.91
-        The characteristic absolute magnitude where the power-law form
-        of the luminosity function cuts off.
-    alpha: float, default=-1.68
-        The power law index, also known as the faint-end slope.
-    redshift: float or np.ndarray, default=3
-        Redshift used for converting apparent magnitudes into absolute
-        magnitudes.
+    M_grid : np.ndarray
+        Absolute magnitudes
+    band : str
+        Name of Rubin band.
 
     Returns
     -------
     np.ndarray
         Number density in units mag^-1 Mpc^-3
     """
-    # Convert observed magnitudes to absolute
-    DL = cosmo.luminosity_distance(redshift).to(u.pc).value  # Lum. Dist. in pc
-    M_grid = m_grid[..., None] - 5 * np.log10(DL / 10) + 2.5 * np.log10(1 + redshift)
+    # Unpack parameters
+    M_star = lf_params[band]["M_star"]
+    phi_star = 10 ** lf_params[band]["log_phi_star"]
+    alpha_p1 = lf_params[band]["alpha"] + 1
+    beta_p1 = lf_params[band]["beta"] + 1
 
-    # Calculate luminosity function in absolute magnitudes
-    schechter = Schechter1D(10**log_phi_star, M_star, alpha)
+    # Calculate LF
+    dM = M_grid - M_star
+    LF = np.log(10)/2.5 * phi_star / (10 ** (0.4 * alpha_p1 * dM) + 10 ** (0.4 * beta_p1 * dM))
 
-    return schechter(M_grid)
+    return LF
 
 
 def _num_den_per_z(
@@ -105,15 +109,19 @@ def _num_den_per_z(
     # Load completeness
     z, C = get_completeness(band)
 
-    # Calculate luminosity function
-    LF = schecter_lf(det_grid, redshift=z, **lf_params[band])
+    # Convert observed magnitudes to absolute
+    DL = cosmo.luminosity_distance(z).to(u.pc).value  # Lum. Dist. in pc
+    M_grid = det_grid[..., None] - 5 * np.log10(DL / 10) + 2.5 * np.log10(1 + z)
 
-    # Calculate differential comoving volume (Mpc^-3 deg^-2)
+    # Calculate luminosity function
+    LF = dpl_lf(M_grid, band)
+
+    # Calculate dV/dz (Mpc^-3 deg^-2)
     dV = cosmo.differential_comoving_volume(z).value / deg2_per_ster
 
     # Integrate luminosity function to get number density of galaxies
     # in each redshift bin
-    nz = np.trapz(dV * LF * C, det_grid[..., None], axis=0)
+    nz = np.trapz(dV * LF * C, M_grid, axis=0)
 
     return z, nz
 

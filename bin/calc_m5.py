@@ -45,7 +45,7 @@ def run_metric_bundles():
             days = year * 365.25
 
             # Loop over bands
-            for band in "ugr":
+            for band in "ugrizy":
                 # Constraint on exposures
                 constraint = f"filter='{band}' and note not like 'DD%' and night <= {days} and note not like 'twilight_near_sun' "
 
