@@ -1,0 +1,8 @@
+# 5-sigma limiting magnitudes for surveys that measured completeness functions
+# See the completeness_{band}.dat files for details on each band/survey
+# Including details on the detection band defined for each dropout sample
+u  26.07  # depth in z'
+g  26.46  # depth in i
+r  26.10  # depth in z
+i  26.10  # depth in z
+z  25.28  # depth in y

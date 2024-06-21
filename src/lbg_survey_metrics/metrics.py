@@ -188,7 +188,7 @@ def _calc_snr(
         raise RuntimeError(
             "CMB SNR Cache does not exist. Please run bin/create_caches.py"
         )
-    
+
     # Get the number density
     n = density_for_quantile(
         q=q,

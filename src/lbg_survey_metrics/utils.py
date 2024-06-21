@@ -7,28 +7,6 @@ import numpy as np
 data_dir = Path(__file__).parents[2] / "data"
 
 
-def get_completeness(band: str) -> tuple[np.ndarray, np.ndarray]:
-    """Get the completeness curve for the band.
-
-    The completeness is defined as the fraction of galaxies
-    that pass the LBG cut.
-
-    Parameters
-    ----------
-    band: str
-        The name of the band
-
-    Returns
-    -------
-    np.ndarray
-        Redshift grid for completeness curve
-    np.ndarray
-        Completeness
-    """
-    z, C = np.genfromtxt(data_dir / "inputs" / f"completeness_{band}.dat", unpack=True)
-    return z, C
-
-
 # Set the bandpass directory
 try:
     bandpass_dir = Path(os.environ["RUBIN_SIM_DATA_DIR"]) / "throughputs" / "baseline"
@@ -38,7 +16,7 @@ except KeyError:
 
 def get_bandpass(band: str) -> tuple[np.ndarray, np.ndarray]:
     """Get the bandpass for the band.
-    
+
     Parameters
     ----------
     band: str
@@ -57,7 +35,7 @@ def get_bandpass(band: str) -> tuple[np.ndarray, np.ndarray]:
             "The bandpass directory does not seem to exist. "
             "Perhaps you need to bin bin/setup_rubin_sim.sh."
         )
-    
+
     # Load from file
     w, R = np.genfromtxt(bandpass_dir / f"total_{band}.dat", unpack=True)
 
@@ -65,6 +43,27 @@ def get_bandpass(band: str) -> tuple[np.ndarray, np.ndarray]:
     w *= 10
 
     return w, R
+
+
+def get_lensing_noise() -> tuple[np.ndarray, np.ndarray]:
+    """Load the lensing noise.
+
+    This is the minimum-variance baseline forcast for the Simons Obs.
+
+    Returns
+    -------
+    np.ndarray
+        A grid of multipoles (ell)
+    np.ndarray
+        Lensing noise as a function of ell (Nkk)
+    """
+    lensing_noise = np.genfromtxt(
+        data_dir / "inputs/nlkk_v3_1_0_deproj0_SENS1_fsky0p4_it_lT30-3000_lP30-5000.dat"
+    )
+    ell = lensing_noise[:, 0]
+    Nkk = lensing_noise[:, 7]
+
+    return ell, Nkk
 
 
 # Set the cache directory

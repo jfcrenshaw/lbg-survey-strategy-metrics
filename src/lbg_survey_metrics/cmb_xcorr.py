@@ -3,38 +3,24 @@ import pyccl as ccl
 
 from .constants import *
 from .galaxy_distribution import number_density, redshift_distribution
-from .utils import *
-
+from .utils import get_lensing_noise
 
 # Create LCDM Cosmology
 cosmo = ccl.CosmologyVanillaLCDM()
 
-# Minimum-variance baseline forecast for SO lensing noise
-lensing_noise = np.genfromtxt(
-    data_dir / "inputs/nlkk_v3_1_0_deproj0_SENS1_fsky0p4_it_lT30-3000_lP30-5000.dat"
-)
-ell = lensing_noise[:, 0]
-Nkk = lensing_noise[:, 7]
+# Load lensing noise
+ell, Nkk = get_lensing_noise()
 
 
-def create_lbg_tracer(
-    m5: float,
-    band: str,
-    snr_floor: float = 3,
-    dropout: float = 1,
-) -> ccl.tracers.NzTracer:
+def create_lbg_tracer(m5: float, band: str) -> ccl.tracers.NzTracer:
     """Create number density tracer for LBG dropouts.
 
     Parameters
     ----------
     m5: float
-        The 5-sigma limit in the dropout band
+        5-sigma limit in the detection band
     band: str
-        Either "u", "g", or "r".
-    snr_floor: float, default=3
-        The minimum SNR in the dropout band.
-    dropout: float, default=1
-        The change in color required for dropout selection.
+        Name of dropout band
 
     Returns
     -------
@@ -42,9 +28,7 @@ def create_lbg_tracer(
         Number counts tracer for LBGs
     """
     # Get the redshift distribution
-    _z, _pz = redshift_distribution(
-        m5=m5, band=band, snr_floor=snr_floor, dropout=dropout
-    )
+    _z, _pz = redshift_distribution(m5=m5, band=band)
 
     # Increase redshift sample density
     z = np.linspace(1, 8, 1000)
@@ -62,23 +46,16 @@ def create_lbg_tracer(
 
 
 def calc_cross_spectra(
-    m5: float,
-    band: str,
-    snr_floor: float = 3,
-    dropout: float = 1,
+    m5: float, band: str
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Calculate angular cross-spectra of LBGs and CMB Lensing.
 
     Parameters
     ----------
     m5: float
-        The 5-sigma limit in the dropout band
+        5-sigma limit in the detection band
     band: str
-        Either "u", "g", or "r".
-    snr_floor: float, default=3
-        The minimum SNR in the dropout band.
-    dropout: float, default=1
-        The change in color required for dropout selection.
+        Name of dropout band
 
     Returns
     -------
@@ -93,7 +70,7 @@ def calc_cross_spectra(
 
     """
     # Create tracers
-    lbg_tracer = create_lbg_tracer(m5, band, snr_floor, dropout)
+    lbg_tracer = create_lbg_tracer(m5=m5, band=band)
     cmb_lensing = ccl.CMBLensingTracer(cosmo, z_source=1100)
 
     # Calculate cross-spectra
@@ -104,24 +81,15 @@ def calc_cross_spectra(
     return ell, Cgg, Ckg, Ckk
 
 
-def calc_LBGxCMB_snr(
-    m5: float,
-    band: str,
-    snr_floor: float = 3,
-    dropout: float = 1,
-) -> float:
+def calc_LBGxCMB_snr(m5: float, band: str) -> float:
     """Calculate the SNR of LBG x CMB Lensing.
 
     Parameters
     ----------
     m5: float
-        The 5-sigma limit in the dropout band
+        5-sigma limit in the detection band
     band: str
-        Either "u", "g", or "r".
-    snr_floor: float, default=3
-        The minimum SNR in the dropout band.
-    dropout: float, default=1
-        The change in color required for dropout selection.
+        Name of dropout band
 
     Returns
     -------
@@ -129,10 +97,10 @@ def calc_LBGxCMB_snr(
         SNR of the LBG x CMB Lensing signal
     """
     # Calculate spectra
-    ell, Cgg, Ckg, Ckk = calc_cross_spectra(m5, band, snr_floor, dropout)
+    ell, Cgg, Ckg, Ckk = calc_cross_spectra(m5=m5, band=band)
 
     # Get the number density
-    n = number_density(m5, band, snr_floor, dropout)
+    n = number_density(m5=m5, band=band)
 
     # Calculate variance
     var = (
