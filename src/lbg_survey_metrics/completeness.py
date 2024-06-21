@@ -12,10 +12,10 @@ _completeness_meta = {
     )
 }
 
-# Create completeness interpolators
-_completeness_interpolators = {}
+# Load completeness tables
+_completeness_data = {}
 for band in "ugriz":
-    # Load the completeness table
+    # Load data
     df = pd.read_csv(
         data_dir / "inputs" / f"completeness_{band}.dat",
         sep="  ",
@@ -23,12 +23,22 @@ for band in "ugriz":
         engine="python",
     )
 
+    # Calculate differential mags wrt the limiting mag
+    dm = df.columns.to_numpy(dtype=float) - _completeness_meta[band]["m5"]
+    df.columns = dm
+
+    _completeness_data[band] = df
+
+
+# Create completeness interpolators
+_completeness_interpolators = {}
+for band in "ugriz":
+    # Get the completeness table
+    df = _completeness_data[band]
+
     # Get redshift and magnitude grids
     z = df.index.to_numpy()
-    m = df.columns.to_numpy(dtype=float)
-
-    # Calculate differential mags wrt the limiting mag
-    dm = m - _completeness_meta[band]["m5"]
+    dm = df.columns.to_numpy(dtype=float)
 
     # Create the interpolator
     _completeness_interpolators[band] = RegularGridInterpolator(
