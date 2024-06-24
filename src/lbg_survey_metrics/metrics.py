@@ -259,6 +259,64 @@ def total_lbgs(m5: maf.MetricBundle, band: str) -> tuple[float, float, float]:
     return N.sum()
 
 
+def get_m5_ranges(
+    m5_drop: np.ma.MaskedArray,
+    m5_det: np.ma.MaskedArray,
+    quantile_cut: float = 0.25,
+    cut_on_drop: bool = True,
+    snr_floor: float = 3,
+    dropout: float = 1,
+) -> dict:
+    """Get m5 ranges, assuming the specified cuts
+
+    Parameters
+    ----------
+    m5_drop: np.ma.MaskedArray
+        Map of 5-sigma depths in the dropout band.
+    m5_det: np.ma.MaskedArray
+        Map of 5-sigma depths in the detection band.
+    quantile_cut: float, default=0.25
+        Quantile of m5 magnitudes to make depth cut.
+    cut_on_drop: bool, default=True
+        Whether create the cut from the dropout band.
+    snr_floor: float, default=3
+        Minimum SNR in the dropout band.
+        Only relevant if cut_on_drop is True.
+    dropout: float, default=1
+        Minimum change in color for a dropout.
+        Only relevant if cut_on_drop is True.
+
+    Returns
+    -------
+    float
+        Minimum of detection band range, given the specified cuts
+    float
+        Maximum of detection band range, given the specified cuts
+    """
+    # Create cut
+    if cut_on_drop:
+        drop_cut = np.quantile(m5_drop[m5_drop.mask == False].data, quantile_cut)
+        det_cut = drop_cut + 2.5 * np.log10(5 / snr_floor) - dropout
+    else:
+        drop_cut = -np.inf
+        det_cut = np.quantile(m5_det[m5_det.mask == False].data, quantile_cut)
+
+    # Create a mask for the maps
+    mask = m5_drop.mask | m5_det.mask | (m5_drop < drop_cut) | (m5_det < det_cut)
+
+    ranges = {
+        "drop_cut": drop_cut,
+        "drop_min": m5_drop[mask == False].min(),
+        "drop_max": m5_drop[mask == False].max(),
+        "det_cut": det_cut,
+        "det_min": m5_det[mask == False].min(),
+        "det_max": m5_det[mask == False].max(),
+        "mask": mask,
+    }
+
+    return ranges
+
+
 def _create_map(
     interpolator: RegularGridInterpolator,
     m5_drop: np.ma.MaskedArray,
@@ -294,17 +352,19 @@ def _create_map(
     np.ma.MaskedArray
         Mask of relative density variations.
     """
-    # Create cut
-    if cut_on_drop:
-        drop_cut = np.quantile(m5_drop[m5_drop.mask == False].data, quantile_cut)
-        det_cut = drop_cut + 2.5 * np.log10(5 / snr_floor) - dropout
-    else:
-        drop_cut = -np.inf
-        det_cut = np.quantile(m5_det[m5_det.mask == False].data, quantile_cut)
+    # Get band ranges
+    ranges = get_m5_ranges(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        quantile_cut=quantile_cut,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
 
     # Evaluate the metric
-    metric = np.ma.array(interpolator((m5_det, det_cut)), fill_value=np.nan)
-    metric.mask = m5_drop.mask | (m5_drop < drop_cut) | (m5_det < det_cut)
+    metric = np.ma.array(interpolator((m5_det, ranges["det_cut"])), fill_value=np.nan)
+    metric.mask = ranges["mask"]
 
     return metric
 
