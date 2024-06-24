@@ -1,5 +1,5 @@
 # Completeness from HSC GOLDRUSH I (https://arxiv.org/abs/1704.06004)
-# Provided by Yoshiaki Ono
+# Provided by Yoshiaki Ono (slightly changed to improve extrap. at faint end)
 # Columns are apparent UV magnitude
 # Rows are redshift
 # Entries are completeness C(m, z)
@@ -11,8 +11,8 @@
 4.1  0.000  0.000  0.000  0.000  0.000  0.000
 4.2  0.000  0.000  0.000  0.000  0.000  0.000
 4.3  0.000  0.000  0.000  0.000  0.000  0.013
-4.4  0.045  0.110  0.146  0.043  0.040  0.013
-4.5  0.436  0.495  0.492  0.408  0.318  0.161
+4.4  0.200  0.170  0.146  0.043  0.040  0.013
+4.5  0.501  0.495  0.492  0.408  0.318  0.161
 4.6  0.642  0.555  0.528  0.520  0.440  0.166
 4.7  0.580  0.537  0.491  0.542  0.516  0.346
 4.8  0.544  0.500  0.488  0.503  0.538  0.267

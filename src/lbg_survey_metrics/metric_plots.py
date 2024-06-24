@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import healpy as hp
 
 
 def plot_u_strategy_matrix(
@@ -42,4 +43,66 @@ def plot_u_strategy_matrix(
             title=f"Year {year}",
         )
 
+        axes[i].plot(
+            [-0.48, 0.5, 0.5, -0.48, -0.48],
+            [-0.48, -0.48, 0.5, 0.5, -0.48],
+            c="C3",
+            lw=1,
+            zorder=10,
+        )
+        axes[i].plot(
+            [0.5, 1.5, 1.5, 0.5, 0.5], [0.5, 0.5, 1.5, 1.5, 0.5], c="C3", lw=1, ls="--"
+        )
+
     fig.suptitle(title)
+
+    return fig, axes
+
+
+def plot_map(
+    values: np.ma.MaskedArray,
+    title: str | None = None,
+    n_dec: int = 2,
+    sub: int | None = None,
+) -> None:
+    """Plot metric on a Mollweide map.
+
+    Parameters
+    ----------
+    values: np.ma.MaskedArray
+        Metric values
+    title: str or None, default=None
+        Title for map
+    n_dec: int, default=2
+        Number of decimals to display in colorbar ticks
+    sub: int or None, default=None
+        Integer indicating with subplot to plot the map on. For example, if you
+        do `fig, axes = plt.subplots(2, 2)`, and want to put this map on the
+        lower right subplot, you set `sub=224`.
+    """
+    # Don't allow healpy to override font sizes
+    fontsize = {
+        "xlabel": None,
+        "ylabel": None,
+        "title": None,
+        "xtick_label": None,
+        "ytick_label": None,
+        "cbar_label": None,
+        "cbar_tick_label": None,
+    }
+
+    # Get value limits
+    limit = np.abs(values).max()
+
+    # Plot map
+    hp.projview(
+        values,
+        title=title,
+        sub=sub,
+        cmap="coolwarm",
+        min=-limit,
+        max=+limit,
+        cbar_ticks=[-limit, 0, +limit],
+        format=f"%.{n_dec}f",
+        fontsize=fontsize,
+    )

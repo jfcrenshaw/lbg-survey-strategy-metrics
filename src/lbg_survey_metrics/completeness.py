@@ -31,7 +31,7 @@ for band in "ugriz":
 
 
 # Create completeness interpolators
-_completeness_interpolators = {}
+_completeness_interpolator = {}
 for band in "ugriz":
     # Get the completeness table
     df = _completeness_data[band]
@@ -41,16 +41,17 @@ for band in "ugriz":
     dm = df.columns.to_numpy(dtype=float)
 
     # Create the interpolator
-    _completeness_interpolators[band] = RegularGridInterpolator(
+    _completeness_interpolator[band] = RegularGridInterpolator(
         (z, dm),
         df.values,
         bounds_error=False,
         fill_value=None,  # linear extrapolation
     )
 
-    # Save zmin, zmax in the metadata
-    _completeness_meta[band]["zmin"] = z.min()
-    _completeness_meta[band]["zmax"] = z.max()
+    # Save z_min, z_max, dm_max in the metadata
+    _completeness_meta[band]["z_min"] = z.min()
+    _completeness_meta[band]["z_max"] = z.max()
+    _completeness_meta[band]["dm_max"] = dm.max()
 
 
 def completeness(m, z, band, m5):
@@ -73,11 +74,13 @@ def completeness(m, z, band, m5):
         Completenesses evaluated on the m, z grid
     """
     # Calculate completeness
-    C = np.clip(_completeness_interpolators[band]((z, m - m5)), 0, 1)
+    dm = m - m5
+    C = np.clip(_completeness_interpolator[band]((z, dm)), 0, 1)
 
-    # Set vals outside redshift range to zero
-    zmin = _completeness_meta[band]["zmin"]
-    zmax = _completeness_meta[band]["zmax"]
-    C *= (z >= zmin) & (z <= zmax)
+    # Set vals outside redshift range and too shallow to zero
+    z_min = _completeness_meta[band]["z_min"]
+    z_max = _completeness_meta[band]["z_max"]
+    dm_max = _completeness_meta[band]["dm_max"]
+    C *= (z >= z_min) & (z <= z_max) & (dm < dm_max + 0.5)
 
     return C

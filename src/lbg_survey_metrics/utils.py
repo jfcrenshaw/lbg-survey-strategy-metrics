@@ -66,10 +66,20 @@ def get_lensing_noise() -> tuple[np.ndarray, np.ndarray]:
     return ell, Nkk
 
 
-# Set the cache directory
+# Load the caches
 cache_dir = data_dir / "caches"
 
-# Load the caches
+cache_file_number_density = cache_dir / "cache_number_density.npz"
+if cache_file_number_density.exists():
+    _cache_number_density = np.load(cache_file_number_density, allow_pickle=True)
+    cache_number_density = {
+        "m5": _cache_number_density["m5"],
+        "n": _cache_number_density["n"].tolist(),
+    }
+else:
+    cache_number_density = None
+
+
 cache_file_pz_stat = cache_dir / "cache_pz_stat.npz"
 if cache_file_pz_stat.exists():
     _cache_pz_stat = np.load(cache_file_pz_stat, allow_pickle=True)

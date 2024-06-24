@@ -45,7 +45,11 @@ def dpl_lf(M: np.ndarray, z: np.ndarray) -> np.ndarray:
     return LF
 
 
-def dndz(m5: np.ndarray, band: str) -> tuple[np.ndarray, np.ndarray]:
+def dndz(
+    m5: np.ndarray,
+    band: str,
+    m5_cut: float | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Calculate projected number density per redshift.
 
     Parameters
@@ -54,6 +58,11 @@ def dndz(m5: np.ndarray, band: str) -> tuple[np.ndarray, np.ndarray]:
         5-sigma limit in the detection band
     band: str
         Name of dropout band
+    m5_cut: float or None
+        Limiting magnitude to set detection threshold. If None, m5 is used.
+        Setting this separately allows you to investigate non-uniformity.
+        I.e., you can cut on a single magnitude, but the regular m5 parameter
+        still varies the completeness function.
 
     Returns
     -------
@@ -65,8 +74,11 @@ def dndz(m5: np.ndarray, band: str) -> tuple[np.ndarray, np.ndarray]:
     # Make sure m5 is an array
     m5 = np.atleast_1d(m5)
 
+    # If m5_cut is None, just use m5
+    m5_cut = m5 if m5_cut is None else m5_cut
+
     # Create grid of apparent magnitudes and redshifts
-    m = np.linspace(20, m5, 1_001).T[..., None]
+    m = np.linspace(20, m5_cut, 1_001).T[..., None]
     z = np.arange(2, 8, 0.1)[None, None, :]
 
     # Convert apparent to absolute magnitude
@@ -89,7 +101,11 @@ def dndz(m5: np.ndarray, band: str) -> tuple[np.ndarray, np.ndarray]:
     return z.squeeze(), nz
 
 
-def number_density(m5: np.ndarray, band: str) -> float:
+def number_density(
+    m5: np.ndarray,
+    band: str,
+    m5_cut: np.ndarray | None = None,
+) -> float:
     """Calculate number density per deg^2.
 
     Parameters
@@ -98,6 +114,11 @@ def number_density(m5: np.ndarray, band: str) -> float:
         5-sigma limit in the detection band
     band: str
         Name of dropout band
+    m5_cut: float
+        Limiting magnitude to set detection threshold. If None, then m5 is
+        used. Setting this separately allows you to investigate non-uniformity.
+        I.e., you can cut on a single magnitude, but the regular m5 parameter
+        still varies the completeness function.
 
     Returns
     -------
@@ -105,7 +126,7 @@ def number_density(m5: np.ndarray, band: str) -> float:
         The total number density of galaxies in units deg^-2.
     """
     # Get number of galaxies in each redshift bin
-    z, nz = dndz(m5=m5, band=band)
+    z, nz = dndz(m5=m5, band=band, m5_cut=m5_cut)
 
     # Integrate over redshift bins
     n = np.trapz(nz, z, axis=-1)
@@ -113,7 +134,11 @@ def number_density(m5: np.ndarray, band: str) -> float:
     return n
 
 
-def redshift_distribution(m5: float, band: str) -> tuple[np.ndarray, np.ndarray]:
+def redshift_distribution(
+    m5: float,
+    band: str,
+    m5_cut: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Get the redshift distribution of the dropout sample.
 
     Parameters
@@ -122,6 +147,11 @@ def redshift_distribution(m5: float, band: str) -> tuple[np.ndarray, np.ndarray]
         5-sigma limit in the detection band
     band: str
         Name of dropout band
+    m5_cut: float
+        Limiting magnitude to set detection threshold. If None, then m5 is
+        used. Setting this separately allows you to investigate non-uniformity.
+        I.e., you can cut on a single magnitude, but the regular m5 parameter
+        still varies the completeness function.
 
     Returns
     -------
@@ -134,7 +164,7 @@ def redshift_distribution(m5: float, band: str) -> tuple[np.ndarray, np.ndarray]
     m5 = np.atleast_1d(m5)
 
     # Get number of galaxies in each redshift bin
-    z, nz = dndz(m5=m5, band=band)
+    z, nz = dndz(m5=m5, band=band, m5_cut=m5_cut)
 
     # Integrate over redshift bins
     n = np.trapz(nz, z, axis=-1)
