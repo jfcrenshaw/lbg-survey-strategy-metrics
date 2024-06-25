@@ -1,24 +1,75 @@
+import healpy as hp
 import matplotlib.pyplot as plt
 import numpy as np
-import healpy as hp
+import pandas as pd
 
 
 def plot_u_strategy_matrix(
-    data, band, metric, title=None, vmin=None, vmax=None, two_dec=False, norm=1
-):
+    data: pd.DataFrame,
+    band: str,
+    metric: str,
+    title: str | None = None,
+    normalize: bool = True,
+    two_dec: bool = True,
+    box_fid: bool = True,
+) -> tuple[plt.Figure, plt.Axes]:
+    """Plot matrix for u band strategy metrics.
+
+    Parameters
+    ----------
+    data: pd.DataFrame
+        DataFrame containing u band strategy metrics.
+        Created by `bin/calc_ustrat_metrics.py`
+    band: str
+        Name of the dropout band
+    metric: str
+        Name of the metric to plot
+    title: str, default=None
+        Title of the plot
+    normalize: bool, default=True
+        Whether to normalize all values to the baseline strategy
+    two_dec: bool, default=True
+        Whether to display two decimal points for printed metrics.
+        If False, only one decimal place is shown
+    box_fid: bool, default=True
+        Whether to draw dashed red box around the fiducial strategy
+        (i.e. 1.1x visits, 38s exposures)
+
+    Returns
+    -------
+    plt.Figure
+        The matplotlib figure
+    plt.Axes
+        The plot axes
+    """
     # Create the figure
     fig, axes = plt.subplots(1, 2, figsize=(6.4, 3.2), constrained_layout=True, dpi=150)
 
+    # Query metrics for the band and create a table with the relevant
+    # metric for different u-band strategies
+    table = pd.pivot_table(
+        data.query(f"band == '{band}'"),
+        metric,
+        ["year", "scale", "expt"],
+        dropna=False,
+    )
+
     for i, year in enumerate([1, 10]):
-        # Accumulate metric values
-        vals = []
-        for scale in data[band][year]:
-            for expt in data[band][year][scale]:
-                vals.append(data[band][year][scale][expt][metric])
-        vals = np.array(vals).reshape(4, 4) / norm
+        # Extract metric values
+        vals = table.loc[year].to_numpy().reshape(4, 4).T
+
+        if normalize:
+            # Normalize metric to baseline strategy
+            vals /= vals[0, 0]
 
         # Plot metric colors
-        axes[i].imshow(vals, cmap="coolwarm", vmin=vmin, vmax=vmax, origin="lower")
+        axes[i].imshow(
+            vals,
+            cmap="coolwarm",
+            vmin=np.nanmin(vals),
+            vmax=np.nanmax(vals),
+            origin="lower",
+        )
 
         # Plot metric labels
         for (j, k), z in np.ndenumerate(vals):
@@ -35,25 +86,25 @@ def plot_u_strategy_matrix(
         # Set axes properties
         axes[i].set(
             xticks=np.arange(4),
-            xticklabels=data[band][year].keys(),
+            xticklabels=table.index.get_level_values(1).unique(),
             xlabel="Fraction of $u$ band visits",
             yticks=np.arange(4),
-            yticklabels=data[band][year][1.0].keys(),
+            yticklabels=table.index.get_level_values(2).unique(),
             ylabel="$u$ band exposure time",
             title=f"Year {year}",
         )
 
-        axes[i].plot(
-            [-0.48, 0.5, 0.5, -0.48, -0.48],
-            [-0.48, -0.48, 0.5, 0.5, -0.48],
-            c="C3",
-            lw=1,
-            zorder=10,
-        )
-        axes[i].plot(
-            [0.5, 1.5, 1.5, 0.5, 0.5], [0.5, 0.5, 1.5, 1.5, 0.5], c="C3", lw=1, ls="--"
-        )
+        if box_fid:
+            # Box the fiducial strategy
+            axes[i].plot(
+                [0.5, 1.5, 1.5, 0.5, 0.5],
+                [0.5, 0.5, 1.5, 1.5, 0.5],
+                c="C3",
+                lw=1,
+                ls="--",
+            )
 
+    # Set the title
     fig.suptitle(title)
 
     return fig, axes

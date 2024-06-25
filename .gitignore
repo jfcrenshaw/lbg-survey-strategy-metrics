@@ -169,3 +169,9 @@ data/rubin_sim*
 
 # Ignore caches
 data/caches
+
+# Also the u band strategy metrics
+data/metrics_uband_strategy.pkl
+
+# Ignore the old directory
+old/

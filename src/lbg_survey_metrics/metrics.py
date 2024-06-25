@@ -37,228 +37,6 @@ _pz_sig_interpolator = {
 }
 
 
-def density_for_quantile(q: float, m5: maf.MetricBundle, band: str) -> float:
-    """Calculate number density of LBGs for the given dropout-band m5 quantile.
-
-    Parameters
-    ----------
-    q : float
-        Quantile of 5-sigma limiting magnitudes. E.g. if q=0.25, then the
-        cut in the dropout band is set to the 25th percentile of extinction-
-        corrected depths.
-    m5 : maf.MetricBundle
-        MAF metric bundle containing 5-sigma limiting magnitudes in the
-        specified band.
-    band : str
-        The band corresponding to the m5 metrics
-
-    Returns
-    -------
-    float
-        Number density of LBGs in deg^{-2}
-    """
-    # Get the limiting magnitudes from the metric bundle
-    m5_array = m5.metric_values[m5.metric_values.mask == False].data
-
-    # Get the limit in the dropout band
-    drop_lim = np.quantile(m5_array, q)
-
-    # Compute the number density
-    return _number_density_interpolator[band]((drop_lim, drop_lim))
-
-
-def _fwfd_from_quantile(q: float, m5: maf.MetricBundle) -> float:
-    """Calculate f_wfd corresponding to the quantile of m5.
-
-    Parameters
-    ----------
-    q : float
-        Quantile of 5-sigma limiting magnitudes. E.g. if q=0.25, then the
-        cut in the dropout band is set to the 25th percentile of extinction-
-        corrected depths.
-    m5 : maf.MetricBundle
-        MAF metric bundle containing 5-sigma limiting magnitudes.
-
-    Returns
-    -------
-    float
-        Fraction of fiducial WFD survey area that is deeper than the m5
-        corresponding to the quantile
-    """
-    # Fraction deeper than m5 quantile
-    f_deeper = 1 - q
-
-    # Number of pixels in this bundle
-    npix = (~m5.metric_values.mask).sum()
-
-    # Area of each pixel
-    pix_area = hp.nside2pixarea(m5.slicer.nside, degrees=True)
-
-    # Total area deeper than m5 quantile
-    area_deeper = f_deeper * npix * pix_area
-
-    # Fraction of fiducial WFD deeper than cut
-    f_wfd = area_deeper / A_wfd
-
-    return f_wfd
-
-
-def fwfd_for_density(n: float, m5: maf.MetricBundle, band: str) -> float:
-    """Calculate fraction of WFD deep enough for requested number density.
-
-    Parameters
-    ----------
-    n : float
-        The requested number density in units deg^{-2}
-    m5 : maf.MetricBundle
-        MAF metric bundle containing 5-sigma limiting magnitudes in the
-        specified band.
-    band : str
-        The band corresponding to the m5 metrics
-
-    Returns
-    -------
-    float
-        Fraction of fiducial WFD that is deep enough to supply the requested
-        number density.
-
-    Raises
-    ------
-    RuntimeError
-        If scipy optimizer fails
-    """
-    # Solve for the sky fraction
-    res = minimize_scalar(
-        lambda q: np.abs(n - density_for_quantile(q=q, m5=m5, band=band)),
-        bounds=(0, 1),
-    )
-
-    # Make sure it worked!
-    if not res.success:
-        raise RuntimeError("Solving for fsky failed.")
-
-    # Calculate f_wfd
-    f_wfd = _fwfd_from_quantile(res.x, m5)
-
-    return f_wfd
-
-
-def _calc_snr(q: float, m5: maf.MetricBundle, band: str) -> float:
-    """Calculate the CMB xcorr SNR corresponding to the quantile.
-
-    Uses a cache for speed.
-
-    Parameters
-    ----------
-    q : float
-        Quantile of 5-sigma limiting magnitudes. E.g. if q=0.25, then the
-        cut in the dropout band is set to the 25th percentile of extinction-
-        corrected depths.
-    m5 : maf.MetricBundle
-        MAF metric bundle containing 5-sigma limiting magnitudes in the
-        specified band.
-    band : str
-        The band corresponding to the m5 metrics
-
-    Returns
-    -------
-    float
-        Signal-to-noise ratio of LBG x CMB Lensing correlation
-    """
-    # Raise error if cache not yet created
-    if cache_cmb_snr is None:
-        raise RuntimeError(
-            "CMB SNR Cache does not exist. Please run bin/create_caches.py"
-        )
-
-    # Get the number density
-    n = density_for_quantile(q=q, m5=m5, band=band)
-
-    # Calculate f_wfd
-    f_wfd = _fwfd_from_quantile(q, m5)
-
-    # Calculate SNR
-    n_grid = cache_cmb_snr["n"][band]
-    snr_grid = cache_cmb_snr["snr"][band]
-    snr = np.interp(n, n_grid, snr_grid * np.sqrt(f_wfd))
-
-    return snr
-
-
-def optimize_snr(m5: maf.MetricBundle, band: str) -> tuple[float, float, float]:
-    """Optimize LBG x CMB Lensing correlation by varying number density and f_wfd.
-
-    Parameters
-    ----------
-    m5 : maf.MetricBundle
-        MAF metric bundle containing 5-sigma limiting magnitudes in the
-        specified band.
-    band : str
-        The band corresponding to the m5 metrics
-
-    Returns
-    -------
-    float
-        Maximized SNR
-    float
-        Number density corresponding to maximum SNR
-    float
-        f_wfd corresponding to maximum SNR
-
-    Raises
-    ------
-    RuntimeError
-        If scipy optimizer fails
-    """
-    # Maximize SNR
-    res = minimize_scalar(
-        lambda q: -_calc_snr(q=q, m5=m5, band=band),
-        bounds=(0, 1),
-    )
-
-    # Make sure it worked!
-    if not res.success:
-        raise RuntimeError("Maximizing SNR failed.")
-
-    # Calculate corresponding number density
-    snr = -res.fun
-    n = density_for_quantile(q=res.x, m5=m5, band=band)
-    f_wfd = _fwfd_from_quantile(res.x, m5)
-
-    return snr, n, f_wfd
-
-
-def total_lbgs(m5: maf.MetricBundle, band: str) -> tuple[float, float, float]:
-    """Calculate total number of LBGs, ignoring uniformity.
-
-    Parameters
-    ----------
-    m5 : maf.MetricBundle
-        MAF metric bundle containing 5-sigma limiting magnitudes in the
-        specified band.
-    band : str
-        The band corresponding to the m5 metrics
-
-    Returns
-    -------
-    float
-        Total number of LBGs detected across the footprint, irrespective
-        of uniformity.
-    """
-    # Get the limiting magnitudes from the metric bundle
-    m5_array = m5.metric_values[m5.metric_values.mask == False].data
-
-    # Interpolate densities
-    n = _number_density_interpolator[band]((m5_array, m5_array))
-
-    # Multiply by pixel area
-    pix_area = hp.nside2pixarea(m5.slicer.nside, degrees=True)
-    N = n * pix_area
-
-    # Sum over all pixels
-    return N.sum()
-
-
 def get_m5_ranges(
     m5_drop: np.ma.MaskedArray,
     m5_det: np.ma.MaskedArray,
@@ -321,10 +99,10 @@ def _create_map(
     interpolator: RegularGridInterpolator,
     m5_drop: np.ma.MaskedArray,
     m5_det: np.ma.MaskedArray,
-    quantile_cut: float = 0.25,
-    cut_on_drop: bool = True,
-    snr_floor: float = 3,
-    dropout: float = 1,
+    quantile_cut: float,
+    cut_on_drop: bool,
+    snr_floor: float,
+    dropout: float,
 ) -> np.ma.MaskedArray:
     """Create the map using cuts and interpolator.
 
@@ -336,14 +114,14 @@ def _create_map(
         Map of 5-sigma depths in the dropout band.
     m5_det: np.ma.MaskedArray
         Map of 5-sigma depths in the detection band.
-    quantile_cut: float, default=0.25
+    quantile_cut: float
         Quantile of m5 magnitudes to make depth cut.
-    cut_on_drop: bool, default=True
+    cut_on_drop: bool
         Whether create the cut from the dropout band.
-    snr_floor: float, default=3
+    snr_floor: float
         Minimum SNR in the dropout band.
         Only relevant if cut_on_drop is True.
-    dropout: float, default=1
+    dropout: float
         Minimum change in color for a dropout.
         Only relevant if cut_on_drop is True.
 
@@ -391,7 +169,7 @@ def map_number_density(
     quantile_cut: float, default=0.25
         Quantile of m5 magnitudes to make depth cut.
     cut_on_drop: bool, default=True
-        Whether create the cut from the dropout band.
+        Whether to create the cut from the dropout band.
     snr_floor: float, default=3
         Minimum SNR in the dropout band.
         Only relevant if cut_on_drop is True.
@@ -508,3 +286,384 @@ def map_pz_sig(
         snr_floor=snr_floor,
         dropout=dropout,
     )
+
+
+def density_for_quantile(
+    m5_drop: np.ma.MaskedArray,
+    m5_det: np.ma.MaskedArray,
+    band: str,
+    quantile_cut: float = 0.25,
+    cut_on_drop: bool = True,
+    snr_floor: float = 3,
+    dropout: float = 1,
+) -> float:
+    """Return the mean LBG number density at the quantile cut.
+
+    Parameters
+    ----------
+    m5_drop: np.ma.MaskedArray
+        Map of 5-sigma depths in the dropout band.
+    m5_det: np.ma.MaskedArray
+        Map of 5-sigma depths in the detection band.
+    band: str
+        Name of the dropout band
+    quantile_cut: float, default=0.25
+        Quantile of m5 magnitudes to make depth cut.
+    cut_on_drop: bool, default=True
+        Whether to create the cut from the dropout band.
+    snr_floor: float, default=3
+        Minimum SNR in the dropout band.
+        Only relevant if cut_on_drop is True.
+    dropout: float, default=1
+        Minimum change in color for a dropout.
+        Only relevant if cut_on_drop is True.
+
+    Returns
+    -------
+    float
+        Average LBG number density in deg^-2
+    """
+    n = map_number_density(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        band=band,
+        quantile_cut=quantile_cut,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
+    return n.mean()
+
+
+def _fwfd_from_quantile(
+    m5_drop: np.ma.MaskedArray,
+    m5_det: np.ma.MaskedArray,
+    quantile_cut: float = 0.25,
+    cut_on_drop: bool = True,
+    snr_floor: float = 3,
+    dropout: float = 1,
+) -> float:
+    """Calculate f_wfd corresponding to the quantile of m5.
+
+    Parameters
+    ----------
+    m5_drop: np.ma.MaskedArray
+        Map of 5-sigma depths in the dropout band.
+    m5_det: np.ma.MaskedArray
+        Map of 5-sigma depths in the detection band.
+    quantile_cut: float, default=0.25
+        Quantile of m5 magnitudes to make depth cut.
+    cut_on_drop: bool, default=True
+        Whether create the cut from the dropout band.
+    snr_floor: float, default=3
+        Minimum SNR in the dropout band.
+        Only relevant if cut_on_drop is True.
+    dropout: float, default=1
+        Minimum change in color for a dropout.
+        Only relevant if cut_on_drop is True.
+
+    Returns
+    -------
+    float
+        Fraction of fiducial WFD survey area that is deeper than the m5
+        corresponding to the quantile
+    """
+    # Fraction deeper than m5 quantile
+    f_deeper = 1 - quantile_cut
+
+    # Get limits
+    ranges = get_m5_ranges(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        quantile_cut=quantile_cut,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
+
+    # Number of pixels passing cuts
+    npix = (~ranges["mask"]).sum()
+
+    # Area of each pixel
+    nside = hp.npix2nside(m5_drop.size)
+    pix_area = hp.nside2pixarea(nside, degrees=True)
+
+    # Total area deeper than m5 quantile
+    area_deeper = f_deeper * npix * pix_area
+
+    # Fraction of fiducial WFD deeper than cut
+    f_wfd = area_deeper / A_wfd
+
+    return f_wfd
+
+
+def fwfd_for_density(
+    m5_drop: np.ma.MaskedArray,
+    m5_det: np.ma.MaskedArray,
+    band: str,
+    n: float,
+    cut_on_drop: bool = True,
+    snr_floor: float = 3,
+    dropout: float = 1,
+) -> float:
+    """Calculate fraction of WFD deep enough for requested number density.
+
+    Parameters
+    ----------
+    m5_drop: np.ma.MaskedArray
+        Map of 5-sigma depths in the dropout band.
+    m5_det: np.ma.MaskedArray
+        Map of 5-sigma depths in the detection band.
+    band: str
+        Name of the dropout band
+    n: float
+        Requested mean number density of LBGs (deg^-2)
+    cut_on_drop: bool, default=True
+        Whether to create the cut from the dropout band.
+    snr_floor: float, default=3
+        Minimum SNR in the dropout band.
+        Only relevant if cut_on_drop is True.
+    dropout: float, default=1
+        Minimum change in color for a dropout.
+        Only relevant if cut_on_drop is True.
+    Returns
+    -------
+    float
+        Fraction of fiducial WFD that is deep enough to supply the requested
+        number density.
+
+    Raises
+    ------
+    RuntimeError
+        If scipy optimizer fails
+    """
+    # Solve for the sky fraction
+    res = minimize_scalar(
+        lambda quantile_cut: np.abs(
+            n
+            - density_for_quantile(
+                m5_drop=m5_drop,
+                m5_det=m5_det,
+                band=band,
+                quantile_cut=quantile_cut,
+                cut_on_drop=cut_on_drop,
+                snr_floor=snr_floor,
+                dropout=dropout,
+            )
+        ),
+        bounds=(0, 1),
+    )
+
+    # Make sure it worked!
+    if not res.success:
+        raise RuntimeError("Solving for fsky failed.")
+
+    # Calculate f_wfd
+    f_wfd = _fwfd_from_quantile(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        quantile_cut=res.x,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
+
+    return f_wfd
+
+
+def _calc_snr(
+    m5_drop: np.ma.MaskedArray,
+    m5_det: np.ma.MaskedArray,
+    band: str,
+    quantile_cut: float = 0.25,
+    cut_on_drop: bool = True,
+    snr_floor: float = 3,
+    dropout: float = 1,
+) -> float:
+    """Calculate CMB x-corr corresponding to quantile.
+
+    Parameters
+    ----------
+    m5_drop: np.ma.MaskedArray
+        Map of 5-sigma depths in the dropout band.
+    m5_det: np.ma.MaskedArray
+        Map of 5-sigma depths in the detection band.
+    band: str
+        Name of the dropout band
+    quantile_cut: float, default=0.25
+        Quantile of m5 magnitudes to make depth cut.
+    cut_on_drop: bool, default=True
+        Whether to create the cut from the dropout band.
+    snr_floor: float, default=3
+        Minimum SNR in the dropout band.
+        Only relevant if cut_on_drop is True.
+    dropout: float, default=1
+        Minimum change in color for a dropout.
+        Only relevant if cut_on_drop is True.
+
+    Returns
+    -------
+    float
+        Signal-to-noise ratio of LBG x CMB Lensing correlation
+    """
+    # Get number density
+    n = density_for_quantile(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        band=band,
+        quantile_cut=quantile_cut,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
+
+    # Calculate f_wfd
+    f_wfd = _fwfd_from_quantile(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        quantile_cut=quantile_cut,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
+
+    # Calculate SNR
+    n_grid = cache_cmb_snr["n"][band]
+    snr_grid = cache_cmb_snr["snr"][band]
+    snr = np.interp(n, n_grid, snr_grid * np.sqrt(f_wfd))
+
+    return snr
+
+
+def optimize_snr(
+    m5_drop: np.ma.MaskedArray,
+    m5_det: np.ma.MaskedArray,
+    band: str,
+    cut_on_drop: bool = True,
+    snr_floor: float = 3,
+    dropout: float = 1,
+) -> tuple[float, float, float]:
+    """Optimize LBG x CMB Lensing correlation by varying number density and f_wfd.
+
+    Parameters
+    ----------
+    m5_drop: np.ma.MaskedArray
+        Map of 5-sigma depths in the dropout band.
+    m5_det: np.ma.MaskedArray
+        Map of 5-sigma depths in the detection band.
+    band: str
+        Name of the dropout band
+    cut_on_drop: bool, default=True
+        Whether to create the cut from the dropout band.
+    snr_floor: float, default=3
+        Minimum SNR in the dropout band.
+        Only relevant if cut_on_drop is True.
+    dropout: float, default=1
+        Minimum change in color for a dropout.
+        Only relevant if cut_on_drop is True.
+
+    Returns
+    -------
+    float
+        Maximized SNR
+    float
+        Number density corresponding to maximum SNR
+    float
+        f_wfd corresponding to maximum SNR
+
+    Raises
+    ------
+    RuntimeError
+        If scipy optimizer fails
+    """
+    # Maximize SNR
+    res = minimize_scalar(
+        lambda quantile_cut: -_calc_snr(
+            m5_drop=m5_drop,
+            m5_det=m5_det,
+            band=band,
+            quantile_cut=quantile_cut,
+            cut_on_drop=cut_on_drop,
+            snr_floor=snr_floor,
+            dropout=dropout,
+        ),
+        bounds=(0, 1),
+    )
+
+    # Make sure it worked!
+    if not res.success:
+        raise RuntimeError("Maximizing SNR failed.")
+
+    # Calculate corresponding number density
+    snr = -res.fun
+    n = density_for_quantile(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        band=band,
+        quantile_cut=res.x,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
+    f_wfd = _fwfd_from_quantile(
+        m5_drop=m5_drop,
+        m5_det=m5_det,
+        quantile_cut=res.x,
+        cut_on_drop=cut_on_drop,
+        snr_floor=snr_floor,
+        dropout=dropout,
+    )
+
+    return snr, n, f_wfd
+
+
+def total_lbgs(
+    m5_drop: np.ma.MaskedArray,
+    m5_det: np.ma.MaskedArray,
+    band: str,
+    cut_on_drop: bool = True,
+    snr_floor: float = 3,
+    dropout: float = 1,
+) -> float:
+    """Calculate total number of LBGs, ignoring uniformity.
+
+    Parameters
+    ----------
+    m5_drop: np.ma.MaskedArray
+        Map of 5-sigma depths in the dropout band.
+    m5_det: np.ma.MaskedArray
+        Map of 5-sigma depths in the detection band.
+    band: str
+        Name of the dropout band
+    cut_on_drop: bool, default=True
+        Whether to create the cut from the dropout band.
+    snr_floor: float, default=3
+        Minimum SNR in the dropout band.
+        Only relevant if cut_on_drop is True.
+    dropout: float, default=1
+        Minimum change in color for a dropout.
+        Only relevant if cut_on_drop is True.
+
+    Returns
+    -------
+    float
+        Total number of LBGs detected across the footprint, irrespective
+        of uniformity.
+    """
+    if cut_on_drop:
+        drop_cut = m5_drop
+        det_cut = drop_cut + 2.5 * np.log10(5 / snr_floor) - dropout
+    else:
+        drop_cut = -np.inf * m5_drop
+        det_cut = m5_det
+
+    # Interpolate densities
+    n = _number_density_interpolator[band]((det_cut, det_cut))
+
+    # Multiply by pixel area
+    nside = hp.npix2nside(m5_drop.size)
+    pix_area = hp.nside2pixarea(nside, degrees=True)
+    N = n * pix_area
+
+    # Sum over all pixels
+    return np.nansum(N)

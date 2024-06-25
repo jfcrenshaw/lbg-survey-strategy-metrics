@@ -14,7 +14,7 @@ if not cache_dir.exists():
     cache_dir.mkdir(parents=True)
 
 # Cache number density
-m5 = np.arange(23, 29, 0.1)
+m5 = np.arange(22, 29, 0.1)
 cache_number_density = {}
 for band in "ugriz":
     cache_number_density[band] = np.array(
@@ -23,7 +23,7 @@ for band in "ugriz":
 np.savez(cache_file_number_density, m5=m5, n=cache_number_density)
 
 # Cache photo-z distribution statistics
-m5 = np.arange(23, 29, 0.1)
+m5 = np.arange(22, 29, 0.1)
 cache_pz_mean = {}
 cache_pz_sig = {}
 for band in "ugriz":
