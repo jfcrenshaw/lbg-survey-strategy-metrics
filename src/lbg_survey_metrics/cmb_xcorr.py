@@ -67,7 +67,6 @@ def calc_cross_spectra(
         Ckg -- LBG x CMB Lensing spectrum
     np.ndarray
         Ckk -- CMB Lensing autospectrum
-
     """
     # Create tracers
     lbg_tracer = create_lbg_tracer(m5=m5, band=band)

@@ -1,6 +1,5 @@
 import healpy as hp
 import numpy as np
-import rubin_sim.maf as maf
 from scipy.interpolate import RegularGridInterpolator
 from scipy.optimize import minimize_scalar
 
